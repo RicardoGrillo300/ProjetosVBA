@@ -1,0 +1,106 @@
+Sub GerarPDFRupturas()
+
+    Dim wsEstoque As Worksheet
+    Dim wsTemp As Worksheet
+    Dim lastRow As Long
+    Dim i As Long
+    Dim material As String
+    Dim descricao As String
+    Dim lote As String
+    Dim quantidade As Long
+    Dim pdfPath As String
+    Dim pdfName As String
+    Dim currentDateTime As String
+    Dim quantidadeTexto As String
+    Dim linhaPDF As Long
+    Dim abaixoDe1375 As Boolean
+
+    ' Definir a planilha de Estoque
+    Set wsEstoque = ThisWorkbook.Sheets("Estoque")
+
+    ' Criar uma nova planilha temporária
+    Set wsTemp = ThisWorkbook.Sheets.Add(After:=Sheets(Sheets.Count))
+    wsTemp.Name = "TempPDF"
+
+    ' Escrever cabeçalhos na planilha temporária
+    wsTemp.Cells(1, 1).Value = "Material"
+    wsTemp.Cells(1, 2).Value = "Descrição"
+    wsTemp.Cells(1, 3).Value = "Lote"
+    wsTemp.Cells(1, 4).Value = "Quantidade"
+
+    ' Ajustar largura das colunas na planilha temporária
+    With wsTemp
+        .Columns("A:A").ColumnWidth = 15
+        .Columns("B:B").ColumnWidth = 40
+        .Columns("C:C").ColumnWidth = 15
+        .Columns("D:D").ColumnWidth = 15
+        .Range("A:A").HorizontalAlignment = xlLeft  ' Alinhar coluna A à esquerda
+        .Range("B:B").HorizontalAlignment = xlLeft  ' Alinhar coluna B à esquerda
+        .Range("C:C").HorizontalAlignment = xlRight  ' Alinhar coluna C à direita
+        .Range("D:D").HorizontalAlignment = xlRight  ' Alinhar coluna C à direita
+    End With
+    ' Inicializar contador de linhas na planilha temporária
+    linhaPDF = 1
+    abaixoDe1375 = False
+
+    ' Encontrar última linha com dados na planilha de Estoque
+    lastRow = wsEstoque.Cells(wsEstoque.Rows.Count, "A").End(xlUp).Row
+
+    ' Loop pelos dados na planilha de Estoque
+    For i = 2 To lastRow
+        quantidadeTexto = Trim(wsEstoque.Cells(i, 5).Text) ' quantidade está na coluna E
+        
+        ' Verificar se a quantidade está como texto e convertê-la para número, se necessário
+        If IsNumeric(quantidadeTexto) Then
+            quantidade = CLng(quantidadeTexto)
+
+            ' Verificar se a quantidade está abaixo de 1375
+            If quantidade < 1375 Then
+                material = wsEstoque.Cells(i, 1).Value ' material está na coluna A
+                descricao = wsEstoque.Cells(i, 2).Value ' descrição está na coluna B
+                lote = wsEstoque.Cells(i, 4).Value ' lote está na coluna D
+
+                ' Escrever dados na planilha temporária
+                linhaPDF = linhaPDF + 1
+                wsTemp.Cells(linhaPDF, 1).Value = material
+                wsTemp.Cells(linhaPDF, 2).Value = descricao
+                wsTemp.Cells(linhaPDF, 3).Value = lote
+                wsTemp.Cells(linhaPDF, 4).Value = quantidade
+
+                abaixoDe1375 = True
+            End If
+        End If
+    Next i
+
+    ' Formatar coluna de Quantidade na planilha temporária
+    wsTemp.Range("D2:D" & linhaPDF).NumberFormat = "#,##0"
+
+    ' Obter data e hora atual para nomear o PDF
+    currentDateTime = Format(Now(), "dd-mm-yyyy_hh.mm.ss")
+
+    ' Salvar a planilha temporária como PDF
+    pdfPath = ThisWorkbook.Path & "\PDFs\"
+    If Dir(pdfPath, vbDirectory) = "" Then MkDir pdfPath ' criar pasta se não existir
+
+    If abaixoDe1375 Then
+        pdfName = "Rupturas_Materiais_" & currentDateTime & ".pdf"
+        wsTemp.ExportAsFixedFormat Type:=xlTypePDF, Filename:=pdfPath & pdfName, Quality:=xlQualityStandard
+
+        ' Limpar e deletar planilha temporária
+        Application.DisplayAlerts = False ' desativar alertas de confirmação
+        wsTemp.Delete
+        Application.DisplayAlerts = True
+
+        ' Exibir mensagem de conclusão
+        MsgBox "PDF de Rupturas gerado com sucesso:" & vbCrLf & pdfPath & pdfName, vbInformation
+    Else
+        ' Se não houver dados abaixo de 1375, excluir planilha temporária sem salvar PDF
+        Application.DisplayAlerts = False ' desativar alertas de confirmação
+        wsTemp.Delete
+        Application.DisplayAlerts = True
+
+        ' Exibir mensagem de aviso
+        MsgBox "Não foram encontrados itens com quantidade abaixo de 1375.", vbExclamation
+    End If
+
+End Sub
